@@ -3,10 +3,14 @@ package readchan
 import (
 	"bufio"
 	"io"
-	"log"
 	"sync"
 )
 
+var (
+	MaxScanTokenSize = bufio.MaxScanTokenSize
+)
+
+// A Chunk contains the []byte Data and error from the previous Read operation.
 type Chunk struct {
 	Data []byte
 	Err  error
@@ -14,19 +18,24 @@ type Chunk struct {
 	pool *sync.Pool
 }
 
+// Done returns the Chunk to a pool to be reused for subsequent Reads.
 func (c *Chunk) Done() {
 	c.pool.Put(c)
 }
 
-func Chunks(r io.Reader, chunkSize int, cancel chan bool) <-chan *Chunk {
-	if chunkSize <= 0 {
-		panic("invalid chunk size")
+// Reads returns a channel that will send a Chunk for every Read on r.
+//
+// The maxSize argument sets the allocated capacity of each []byte.  Closing
+// the cancel channel will cause Reads to return after the next Read operation.
+func Reads(r io.Reader, maxSize int, cancel chan bool) <-chan *Chunk {
+	if maxSize <= 0 {
+		panic("invalid max buffer size")
 	}
 
 	pool := sync.Pool{}
 	pool.New = func() interface{} {
 		return &Chunk{
-			Data: make([]byte, chunkSize),
+			Data: make([]byte, maxSize),
 			pool: &pool,
 		}
 	}
@@ -44,7 +53,6 @@ func Chunks(r io.Reader, chunkSize int, cancel chan bool) <-chan *Chunk {
 		for {
 			select {
 			case <-cancel:
-				log.Println("ReadChan canceled")
 				return
 			default:
 			}
@@ -65,15 +73,22 @@ func Chunks(r io.Reader, chunkSize int, cancel chan bool) <-chan *Chunk {
 	return readChan
 }
 
-func Lines(r io.Reader, chunkSize int, cancel chan bool) <-chan *Chunk {
-	if chunkSize <= 0 {
-		panic("invalid chunk size")
+// Lines returns a channel that will send a Chunk for every line read from r.
+// Lines are read via a bufio.Scanner, and do not include the newline
+// characters.
+//
+// The minSize argument sets the minimum allocated size of each []byte, which
+// may be extended to accommodate longer lines. Closing the cancel channel
+// will cause the Lines reader to return after the next Read operation.
+func Lines(r io.Reader, minSize int, cancel chan bool) <-chan *Chunk {
+	if minSize < 0 {
+		panic("invalid min buffer size")
 	}
 
 	pool := sync.Pool{}
 	pool.New = func() interface{} {
 		return &Chunk{
-			Data: make([]byte, 0, chunkSize),
+			Data: make([]byte, 0, minSize),
 			pool: &pool,
 		}
 	}
@@ -81,6 +96,7 @@ func Lines(r io.Reader, chunkSize int, cancel chan bool) <-chan *Chunk {
 	readChan := make(chan *Chunk)
 
 	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 0, minSize), MaxScanTokenSize)
 
 	go func() {
 		defer close(readChan)
@@ -88,7 +104,7 @@ func Lines(r io.Reader, chunkSize int, cancel chan bool) <-chan *Chunk {
 		for scanner.Scan() {
 			select {
 			case <-cancel:
-				break
+				return
 			default:
 			}
 

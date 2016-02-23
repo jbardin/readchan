@@ -21,7 +21,7 @@ func TestChunkReader(t *testing.T) {
 
 	var newData []byte
 
-	readChan := Chunks(f, 1024, nil)
+	readChan := Reads(f, 1024, nil)
 	for chunk := range readChan {
 		newData = append(newData, chunk.Data...)
 		chunk.Done()
@@ -49,15 +49,21 @@ func TestLineReader(t *testing.T) {
 
 	var newData []byte
 
+	lines := 0
 	readChan := Lines(f, 1024, nil)
 	for chunk := range readChan {
 		newData = append(newData, chunk.Data...)
 		newData = append(newData, '\n')
+		lines++
 
 		chunk.Done()
 		if chunk.Err != nil && chunk.Err != io.EOF {
 			t.Fatal(chunk.Err)
 		}
+	}
+
+	if lines != 1140 {
+		t.Fatalf("incorrect line count. Counted %d, expected %d", lines, 1140)
 	}
 
 	if !bytes.Equal(orig, newData) {
@@ -71,13 +77,13 @@ func BenchmarkChunkReader(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	newData := make([]byte, 1024)
+	newData := make([]byte, 0)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		newData = newData[:0]
 		f.Seek(0, 0)
-		readChan := Chunks(f, 1024, nil)
+		readChan := Reads(f, 1024, nil)
 
 		for chunk := range readChan {
 			newData = append(newData, chunk.Data...)
@@ -96,13 +102,13 @@ func BenchmarkLineReader(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	newData := make([]byte, 1024)
+	newData := make([]byte, 0)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		newData = newData[:0]
 		f.Seek(0, 0)
-		readChan := Lines(f, 1024, nil)
+		readChan := Lines(f, 512, nil)
 		for chunk := range readChan {
 			newData = append(newData, chunk.Data...)
 			chunk.Done()

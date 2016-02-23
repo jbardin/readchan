@@ -27,9 +27,8 @@ func (c *Chunk) Done() {
 //
 // The maxSize argument sets the allocated capacity of each []byte. Reads will
 // buffer readAhead number of Chunks in the channel as soon as they are
-// available. If readAhead is set to 0, the caller must receive from the
-// channel until it is closed to ensure all values are consumed. Closing the
-// cancel channel will cause Reads to return after the next Read operation.
+// available.  Closing the cancel channel will cause Reads loop to return, but
+// it cannot interrupt pending Read calls on r.
 func Reads(r io.Reader, maxSize, readAhead int, cancel chan bool) <-chan *Chunk {
 	if maxSize <= 0 {
 		panic("invalid max buffer size")
@@ -58,18 +57,17 @@ func Reads(r io.Reader, maxSize, readAhead int, cancel chan bool) <-chan *Chunk 
 		defer close(readChan)
 
 		for {
-			select {
-			case <-cancel:
-				return
-			default:
-			}
-
 			chunk := pool.Get().(*Chunk)
 
 			n, err = r.Read(chunk.Data)
 			chunk.Data = chunk.Data[:n]
 			chunk.Err = err
-			readChan <- chunk
+
+			select {
+			case readChan <- chunk:
+			case <-cancel:
+				return
+			}
 
 			if err != nil {
 				return
@@ -86,10 +84,9 @@ func Reads(r io.Reader, maxSize, readAhead int, cancel chan bool) <-chan *Chunk 
 //
 // The minSize argument sets the minimum allocated size of each []byte, which
 // may be extended to accommodate longer lines. Lines will buffer readAhead
-// number of Chunks in the channel as soon as they are available. If readAhead
-// is set to 0, the caller must receive from the channel until it is closed to
-// ensure all values are consumed. Closing the cancel channel will cause the
-// Lines scanner to return after the next value.
+// number of Chunks in the channel as soon as they are available. Closing the
+// cancel channel will cause the Lines scanner loop to return, but it cannot
+// interrupt pending Read calls on r.
 func Lines(r io.Reader, minSize, readAhead int, cancel chan bool) <-chan *Chunk {
 	if minSize < 0 {
 		panic("invalid min buffer size")
@@ -116,18 +113,16 @@ func Lines(r io.Reader, minSize, readAhead int, cancel chan bool) <-chan *Chunk 
 		defer close(readChan)
 
 		for scanner.Scan() {
-			select {
-			case <-cancel:
-				return
-			default:
-			}
-
 			chunk := (pool.Get().(*Chunk))
 			chunk.Data = chunk.Data[:0]
 			chunk.Data = append(chunk.Data, scanner.Bytes()...)
 			chunk.Err = nil
 
-			readChan <- chunk
+			select {
+			case readChan <- chunk:
+			case <-cancel:
+				return
+			}
 		}
 
 		if err := scanner.Err(); err != nil {

@@ -25,11 +25,18 @@ func (c *Chunk) Done() {
 
 // Reads returns a channel that will send a Chunk for every Read on r.
 //
-// The maxSize argument sets the allocated capacity of each []byte.  Closing
-// the cancel channel will cause Reads to return after the next Read operation.
-func Reads(r io.Reader, maxSize int, cancel chan bool) <-chan *Chunk {
+// The maxSize argument sets the allocated capacity of each []byte. Reads will
+// buffer readAhead number of Chunks in the channel as soon as they are
+// available. If readAhead is set to 0, the caller must receive from the
+// channel until it is closed to ensure all values are consumed. Closing the
+// cancel channel will cause Reads to return after the next Read operation.
+func Reads(r io.Reader, maxSize, readAhead int, cancel chan bool) <-chan *Chunk {
 	if maxSize <= 0 {
 		panic("invalid max buffer size")
+	}
+
+	if readAhead < 0 {
+		readAhead = 1
 	}
 
 	pool := sync.Pool{}
@@ -40,7 +47,7 @@ func Reads(r io.Reader, maxSize int, cancel chan bool) <-chan *Chunk {
 		}
 	}
 
-	readChan := make(chan *Chunk)
+	readChan := make(chan *Chunk, readAhead)
 
 	go func() {
 		var (
@@ -78,11 +85,18 @@ func Reads(r io.Reader, maxSize int, cancel chan bool) <-chan *Chunk {
 // characters.
 //
 // The minSize argument sets the minimum allocated size of each []byte, which
-// may be extended to accommodate longer lines. Closing the cancel channel
-// will cause the Lines reader to return after the next Read operation.
-func Lines(r io.Reader, minSize int, cancel chan bool) <-chan *Chunk {
+// may be extended to accommodate longer lines. Lines will buffer readAhead
+// number of Chunks in the channel as soon as they are available. If readAhead
+// is set to 0, the caller must receive from the channel until it is closed to
+// ensure all values are consumed. Closing the cancel channel will cause the
+// Lines scanner to return after the next value.
+func Lines(r io.Reader, minSize, readAhead int, cancel chan bool) <-chan *Chunk {
 	if minSize < 0 {
 		panic("invalid min buffer size")
+	}
+
+	if readAhead < 0 {
+		readAhead = 1
 	}
 
 	pool := sync.Pool{}
@@ -93,7 +107,7 @@ func Lines(r io.Reader, minSize int, cancel chan bool) <-chan *Chunk {
 		}
 	}
 
-	readChan := make(chan *Chunk)
+	readChan := make(chan *Chunk, readAhead)
 
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, minSize), MaxScanTokenSize)

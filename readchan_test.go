@@ -21,7 +21,7 @@ func TestChunkReader(t *testing.T) {
 
 	var newData []byte
 
-	readChan := Reads(f, 1024, nil)
+	readChan := Reads(f, 1024, 1, nil)
 	for chunk := range readChan {
 		newData = append(newData, chunk.Data...)
 		chunk.Done()
@@ -50,7 +50,7 @@ func TestLineReader(t *testing.T) {
 	var newData []byte
 
 	lines := 0
-	readChan := Lines(f, 1024, nil)
+	readChan := Lines(f, 1024, 1, nil)
 	for chunk := range readChan {
 		newData = append(newData, chunk.Data...)
 		newData = append(newData, '\n')
@@ -83,7 +83,7 @@ func BenchmarkChunkReader(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		newData = newData[:0]
 		f.Seek(0, 0)
-		readChan := Reads(f, 1024, nil)
+		readChan := Reads(f, 1024, 1, nil)
 
 		for chunk := range readChan {
 			newData = append(newData, chunk.Data...)
@@ -108,7 +108,7 @@ func BenchmarkLineReader(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		newData = newData[:0]
 		f.Seek(0, 0)
-		readChan := Lines(f, 512, nil)
+		readChan := Lines(f, 512, 1, nil)
 		for chunk := range readChan {
 			newData = append(newData, chunk.Data...)
 			chunk.Done()

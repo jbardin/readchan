@@ -64,7 +64,7 @@ func TestLineReader(t *testing.T) {
 	var newData []byte
 
 	lines := 0
-	readChan := Lines(testReader, 1024, 1, nil)
+	readChan := Lines(testReader, 1, nil)
 	for chunk := range readChan {
 		newData = append(newData, chunk.Data...)
 		newData = append(newData, '\n')
@@ -116,7 +116,7 @@ func BenchmarkLineReader(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		newData = newData[:0]
 		testReader.Seek(0, 0)
-		readChan := Lines(testReader, 512, 1, nil)
+		readChan := Lines(testReader, 1, nil)
 		for chunk := range readChan {
 			newData = append(newData, chunk.Data...)
 			chunk.Done()

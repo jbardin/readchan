@@ -11,7 +11,7 @@ or line, and reading the results via a channel.
       log.Fatal(err)
     }
 
-    for line := range readchan.Lines(f, 1024, 1, nil) {
+    for line := range readchan.Lines(f, 1, nil) {
       if line.Err != nil {
         log.Fatal(err)
       }

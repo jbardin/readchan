@@ -86,24 +86,20 @@ func Reads(r io.Reader, maxSize, readAhead int, cancel chan bool) <-chan *Chunk 
 // Lines are read via a bufio.Scanner, and do not include the newline
 // characters.
 //
-// The minSize argument sets the minimum allocated size of each []byte, which
-// may be extended to accommodate longer lines. Lines will buffer readAhead
-// number of Chunks in the channel as soon as they are available. Closing the
-// cancel channel will cause the Lines scanner loop to return, but it cannot
-// interrupt pending Read calls on r.
-func Lines(r io.Reader, minSize, readAhead int, cancel chan bool) <-chan *Chunk {
-	if minSize < 0 {
-		panic("invalid min buffer size")
-	}
-
+// The readAhead argument determines the buffer size for the channel, which
+// will be filled as soon as data available. Closing the cancel channel will
+// cause the Lines scanner loop to return, but it cannot interrupt pending Read
+// calls on r.
+func Lines(r io.Reader, readAhead int, cancel chan bool) <-chan *Chunk {
 	if readAhead < 0 {
 		readAhead = 1
 	}
 
 	pool := sync.Pool{}
 	pool.New = func() interface{} {
+		// we leave the []byte nil, and let append allocate the exact size
+		// needed.
 		return &Chunk{
-			Data: make([]byte, 0, minSize),
 			pool: &pool,
 		}
 	}
@@ -111,7 +107,6 @@ func Lines(r io.Reader, minSize, readAhead int, cancel chan bool) <-chan *Chunk 
 	readChan := make(chan *Chunk, readAhead)
 
 	scanner := bufio.NewScanner(r)
-	scanner.Buffer(make([]byte, 0, minSize), MaxScanTokenSize)
 
 	go func() {
 		defer close(readChan)

@@ -13,4 +13,5 @@ or line, and reading the results via a channel.
         log.Fatal(err)
       }
       fmt.Printf("LINE: %q\n", line.Data)
+	  line.Done()
     }

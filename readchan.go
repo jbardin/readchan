@@ -1,5 +1,5 @@
 // Package readchan provides methods for interating over an io.Reader by block
-// or line and reading the results via a channel.
+// or line, and reading the results via a channel.
 package readchan
 
 import (

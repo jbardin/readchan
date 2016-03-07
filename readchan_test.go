@@ -2,26 +2,48 @@ package readchan
 
 import (
 	"bytes"
+	"compress/gzip"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"testing"
 )
 
-func TestChunkReader(t *testing.T) {
-	orig, err := ioutil.ReadFile("./testdata/test.data")
+var (
+	testFile = "./testdata/test.data.gz"
+
+	testData   []byte
+	testReader io.ReadSeeker
+)
+
+func init() {
+	var err error
+	f, err := os.Open(testFile)
 	if err != nil {
-		t.Fatal(err)
+		log.Fatal(err)
+	}
+	defer f.Close()
+
+	r, err := gzip.NewReader(f)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	f, err := os.Open("./testdata/test.data")
+	testData, err = ioutil.ReadAll(r)
 	if err != nil {
-		t.Fatal(err)
+		log.Fatal(err)
 	}
+
+	testReader = bytes.NewReader(testData)
+}
+
+func TestChunkReader(t *testing.T) {
+	defer testReader.Seek(0, 0)
 
 	var newData []byte
 
-	readChan := Reads(f, 1024, 1, nil)
+	readChan := Reads(testReader, 1024, 1, nil)
 	for chunk := range readChan {
 		newData = append(newData, chunk.Data...)
 		chunk.Done()
@@ -30,27 +52,19 @@ func TestChunkReader(t *testing.T) {
 		}
 	}
 
-	if !bytes.Equal(orig, newData) {
+	if !bytes.Equal(testData, newData) {
 		t.Fatal("mismatched data")
 	}
 
 }
 
 func TestLineReader(t *testing.T) {
-	orig, err := ioutil.ReadFile("./testdata/test.data")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	f, err := os.Open("./testdata/test.data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	defer testReader.Seek(0, 0)
 
 	var newData []byte
 
 	lines := 0
-	readChan := Lines(f, 1024, 1, nil)
+	readChan := Lines(testReader, 1024, 1, nil)
 	for chunk := range readChan {
 		newData = append(newData, chunk.Data...)
 		newData = append(newData, '\n')
@@ -66,24 +80,21 @@ func TestLineReader(t *testing.T) {
 		t.Fatalf("incorrect line count. Counted %d, expected %d", lines, 1140)
 	}
 
-	if !bytes.Equal(orig, newData) {
+	if !bytes.Equal(testData, newData) {
 		t.Fatal("mismatched data")
 	}
 }
 
 func BenchmarkChunkReader(b *testing.B) {
-	f, err := os.Open("./testdata/test.data")
-	if err != nil {
-		b.Fatal(err)
-	}
+	defer testReader.Seek(0, 0)
 
 	newData := make([]byte, 0)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		newData = newData[:0]
-		f.Seek(0, 0)
-		readChan := Reads(f, 1024, 1, nil)
+		testReader.Seek(0, 0)
+		readChan := Reads(testReader, 1024, 1, nil)
 
 		for chunk := range readChan {
 			newData = append(newData, chunk.Data...)
@@ -97,18 +108,15 @@ func BenchmarkChunkReader(b *testing.B) {
 }
 
 func BenchmarkLineReader(b *testing.B) {
-	f, err := os.Open("./testdata/test.data")
-	if err != nil {
-		b.Fatal(err)
-	}
+	defer testReader.Seek(0, 0)
 
 	newData := make([]byte, 0)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		newData = newData[:0]
-		f.Seek(0, 0)
-		readChan := Lines(f, 512, 1, nil)
+		testReader.Seek(0, 0)
+		readChan := Lines(testReader, 512, 1, nil)
 		for chunk := range readChan {
 			newData = append(newData, chunk.Data...)
 			chunk.Done()

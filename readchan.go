@@ -1,3 +1,5 @@
+// Package readchan provides methods for interating over an io.Reader by block
+// or line and reading the results via a channel.
 package readchan
 
 import (
@@ -11,6 +13,8 @@ var (
 )
 
 // A Chunk contains the []byte Data and error from the previous Read operation.
+// The Data []byte slice is safe for local use until Done is called returning
+// the Chunk to the pool.
 type Chunk struct {
 	Data []byte
 	Err  error

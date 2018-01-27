@@ -3,6 +3,7 @@ package readchan
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"io"
 	"io/ioutil"
 	"log"
@@ -43,7 +44,7 @@ func TestChunkReader(t *testing.T) {
 
 	var newData []byte
 
-	readChan := Reads(testReader, 1024, 1, nil)
+	readChan := Reads(context.TODO(), testReader, 1024, 1)
 	for chunk := range readChan {
 		newData = append(newData, chunk.Data...)
 		chunk.Done()
@@ -64,7 +65,7 @@ func TestLineReader(t *testing.T) {
 	var newData []byte
 
 	lines := 0
-	readChan := Lines(testReader, 1, nil)
+	readChan := Lines(context.TODO(), testReader, 1)
 	for chunk := range readChan {
 		newData = append(newData, chunk.Data...)
 		newData = append(newData, '\n')
@@ -94,7 +95,7 @@ func BenchmarkChunkReader(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		newData = newData[:0]
 		testReader.Seek(0, 0)
-		readChan := Reads(testReader, 1024, 1, nil)
+		readChan := Reads(context.TODO(), testReader, 1024, 1)
 
 		for chunk := range readChan {
 			newData = append(newData, chunk.Data...)
@@ -116,7 +117,7 @@ func BenchmarkLineReader(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		newData = newData[:0]
 		testReader.Seek(0, 0)
-		readChan := Lines(testReader, 1, nil)
+		readChan := Lines(context.TODO(), testReader, 1)
 		for chunk := range readChan {
 			newData = append(newData, chunk.Data...)
 			chunk.Done()

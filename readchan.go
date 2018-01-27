@@ -4,6 +4,7 @@ package readchan
 
 import (
 	"bufio"
+	"context"
 	"io"
 	"sync"
 )
@@ -31,9 +32,9 @@ func (c *Chunk) Done() {
 //
 // The maxSize argument sets the allocated capacity of each []byte. Reads will
 // buffer readAhead number of Chunks in the channel as soon as they are
-// available.  Closing the cancel channel will cause Reads loop to return, but
+// available.  Canceling the context will cause the Reads loop to return, but
 // it cannot interrupt pending Read calls on r.
-func Reads(r io.Reader, maxSize, readAhead int, cancel chan bool) <-chan *Chunk {
+func Reads(ctx context.Context, r io.Reader, maxSize, readAhead int) <-chan *Chunk {
 	if maxSize <= 0 {
 		panic("invalid max buffer size")
 	}
@@ -69,7 +70,7 @@ func Reads(r io.Reader, maxSize, readAhead int, cancel chan bool) <-chan *Chunk 
 
 			select {
 			case readChan <- chunk:
-			case <-cancel:
+			case <-ctx.Done():
 				return
 			}
 
@@ -87,10 +88,10 @@ func Reads(r io.Reader, maxSize, readAhead int, cancel chan bool) <-chan *Chunk 
 // characters.
 //
 // The readAhead argument determines the buffer size for the channel, which
-// will be filled as soon as data available. Closing the cancel channel will
+// will be filled as soon as data available. Canceling the context will
 // cause the Lines scanner loop to return, but it cannot interrupt pending Read
 // calls on r.
-func Lines(r io.Reader, readAhead int, cancel chan bool) <-chan *Chunk {
+func Lines(ctx context.Context, r io.Reader, readAhead int) <-chan *Chunk {
 	if readAhead < 0 {
 		readAhead = 1
 	}
@@ -119,7 +120,7 @@ func Lines(r io.Reader, readAhead int, cancel chan bool) <-chan *Chunk {
 
 			select {
 			case readChan <- chunk:
-			case <-cancel:
+			case <-ctx.Done():
 				return
 			}
 		}

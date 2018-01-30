@@ -56,7 +56,6 @@ func TestChunkReader(t *testing.T) {
 	if !bytes.Equal(testData, newData) {
 		t.Fatal("mismatched data")
 	}
-
 }
 
 func TestLineReader(t *testing.T) {
@@ -104,7 +103,6 @@ func BenchmarkChunkReader(b *testing.B) {
 				b.Fatal(chunk.Err)
 			}
 		}
-
 	}
 }
 

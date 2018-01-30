@@ -54,10 +54,8 @@ func Reads(ctx context.Context, r io.Reader, maxSize, readAhead int) <-chan *Chu
 	readChan := make(chan *Chunk, readAhead)
 
 	go func() {
-		var (
-			n   int
-			err error
-		)
+		var n int
+		var err error
 
 		defer close(readChan)
 
@@ -98,8 +96,6 @@ func Lines(ctx context.Context, r io.Reader, readAhead int) <-chan *Chunk {
 
 	pool := sync.Pool{}
 	pool.New = func() interface{} {
-		// we leave the []byte nil, and let append allocate the exact size
-		// needed.
 		return &Chunk{
 			pool: &pool,
 		}
@@ -114,9 +110,12 @@ func Lines(ctx context.Context, r io.Reader, readAhead int) <-chan *Chunk {
 
 		for scanner.Scan() {
 			chunk := (pool.Get().(*Chunk))
-			chunk.Data = chunk.Data[:0]
-			chunk.Data = append(chunk.Data, scanner.Bytes()...)
+			if chunk.Data != nil {
+				chunk.Data = chunk.Data[:0]
+			}
 			chunk.Err = nil
+
+			chunk.Data = append(chunk.Data, scanner.Bytes()...)
 
 			select {
 			case readChan <- chunk:
@@ -132,9 +131,7 @@ func Lines(ctx context.Context, r io.Reader, readAhead int) <-chan *Chunk {
 
 			readChan <- chunk
 		}
-
 	}()
 
 	return readChan
-
 }
